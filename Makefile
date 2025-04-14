@@ -1,4 +1,4 @@
-.PHONY: setup build deploy
+.PHONY: setup build deploy test
 
 # Configuration variables
 STACK_NAME ?= lambda-starter-template
@@ -29,3 +29,8 @@ build:
 deploy: build
 	@echo "Deploying SAM application to $(ENVIRONMENT) environment..."
 	sam deploy --guided
+
+# Test SAM application
+test:
+	@echo "Testing SAM application..."
+	python -m pytest
