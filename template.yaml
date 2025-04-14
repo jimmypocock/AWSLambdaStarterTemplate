@@ -1,15 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Lambda Function Template
-
-Parameters:
-  Environment:
-    Type: String
-    Default: dev
-    AllowedValues:
-      - dev
-      - prod
-    Description: Environment to deploy to
+Description: Multi-Function Lambda API
 
 Globals:
   Function:
@@ -18,18 +9,27 @@ Globals:
     Runtime: python3.12
     Architectures:
       - arm64
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Stage
+
+Parameters:
+  Stage:
+    Type: String
+    Default: Dev
+    AllowedValues:
+      - Dev
+      - Prod
+    Description: API Gateway Stage Name
 
 Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: app.lambda_handler
-      Environment:
-        Variables:
-          ENVIRONMENT: !Ref Environment
+      Handler: functions.hello.app.lambda_handler
       Tags:
-        Environment: !Ref Environment
+        Environment: !Ref Stage
       Events:
         HelloWorld:
           Type: Api
@@ -37,10 +37,27 @@ Resources:
             Path: /hello
             Method: get
 
+  GoodbyeWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: functions.goodbye.app.lambda_handler
+      Tags:
+        Environment: !Ref Stage
+      Events:
+        GoodbyeWorld:
+          Type: Api
+          Properties:
+            Path: /goodbye
+            Method: get
+
 Outputs:
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
   HelloWorldFunction:
     Description: "Hello World Lambda Function ARN"
     Value: !GetAtt HelloWorldFunction.Arn
+  GoodbyeWorldFunction:
+    Description: "Goodbye World Lambda Function ARN"
+    Value: !GetAtt GoodbyeWorldFunction.Arn

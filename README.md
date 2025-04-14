@@ -4,12 +4,13 @@ A professional template for AWS Lambda functions with development and production
 
 ## Features
 
-- Simple Hello World Lambda function
+- Multiple Lambda functions with separate endpoints
 - Development and Production environments
 - Testing framework with pytest and moto
 - Local development and testing capabilities
 - SAM template for deployment
 - API Gateway integration
+- Shared utilities for common functionality
 
 ## Prerequisites
 
@@ -33,12 +34,14 @@ pip install -r requirements.txt
 
 ## Local Development
 
-To run the function locally:
+To run the functions locally:
 ```bash
 sam local start-api
 ```
 
-The API will be available at http://localhost:3000/hello
+The API will be available at:
+- http://localhost:3000/hello
+- http://localhost:3000/goodbye
 
 ## Testing
 
@@ -54,12 +57,17 @@ pytest --cov=src tests/
 
 ## Deployment
 
-Deploy to development environment:
+1. Build the application:
+```bash
+sam build
+```
+
+2. Deploy to development environment:
 ```bash
 sam deploy --guided --parameter-overrides Environment=dev
 ```
 
-Deploy to production environment:
+3. Deploy to production environment:
 ```bash
 sam deploy --guided --parameter-overrides Environment=prod
 ```
@@ -69,19 +77,49 @@ sam deploy --guided --parameter-overrides Environment=prod
 ```
 LambdaTemplate/
 ├── src/
-│   └── app.py           # Lambda function code
+│   ├── functions/
+│   │   ├── hello/
+│   │   │   ├── __init__.py
+│   │   │   └── app.py        # Hello World Lambda function
+│   │   ├── goodbye/
+│   │   │   ├── __init__.py
+│   │   │   └── app.py        # Goodbye World Lambda function
+│   │   └── __init__.py
+│   ├── shared/
+│   │   ├── __init__.py
+│   │   └── utils.py          # Shared utilities
+│   └── __init__.py
 ├── tests/
-│   └── test_app.py      # Test suite
-├── template.yaml        # SAM template
-├── requirements.txt     # Python dependencies
-└── README.md           # This file
+│   └── test_app.py           # Test suite
+├── template.yaml             # SAM template
+├── requirements.txt          # Python dependencies
+└── README.md                # This file
 ```
 
 ## Environment Variables
 
-The function uses the following environment variables:
+The functions use the following environment variables:
 - `ENVIRONMENT`: Set to either 'dev' or 'prod' based on deployment
+
+The environment variable is automatically set during deployment based on the `Environment` parameter:
+```bash
+# Sets ENVIRONMENT=prod in all Lambda functions
+sam deploy --guided --parameter-overrides Environment=prod
+
+# Sets ENVIRONMENT=dev in all Lambda functions
+sam deploy --guided --parameter-overrides Environment=dev
+```
+
+You can verify the environment in the API response, which will include the current environment in the message.
+
+## Adding New Functions
+
+To add a new Lambda function:
+
+1. Create a new directory under `src/functions/`
+2. Create an `app.py` file with your Lambda handler
+3. Add a new function resource in `template.yaml` with its API Gateway endpoint
 
 ## License
 
-MIT 
+MIT

@@ -1,4 +1,4 @@
-.PHONY: setup
+.PHONY: setup build deploy
 
 # Configuration variables
 STACK_NAME ?= lambda-starter-template
@@ -19,3 +19,13 @@ setup:
 	$(VENV_ACTIVATE) && $(PIP) install --upgrade pip
 	$(VENV_ACTIVATE) && $(PIP) install -r requirements.txt
 	@echo "✅ Development environment set up successfully"
+
+# Build SAM application
+build:
+	@echo "Building SAM application..."
+	sam build
+
+# Deploy SAM application
+deploy: build
+	@echo "Deploying SAM application to $(ENVIRONMENT) environment..."
+	sam deploy --guided
