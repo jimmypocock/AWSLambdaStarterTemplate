@@ -62,6 +62,18 @@ Resources:
         - python3.12
       RetentionPolicy: Retain
 
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-items"
+      AttributeDefinitions:
+        - AttributeName: itemId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: itemId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
   HelloWorldFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -96,6 +108,28 @@ Resources:
             Auth:
               Authorizer: CognitoAuthorizer
 
+  HelloItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: functions.hello_item.app.lambda_handler
+      Tags:
+        Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+      Events:
+        HelloItem:
+          Type: Api
+          Properties:
+            Path: /hello/{itemId}
+            Method: get
+
 Outputs:
   ApiEndpoint:
     Description: "API Gateway endpoint URL"
@@ -115,3 +149,6 @@ Outputs:
   UserPoolClientId:
     Description: "Cognito User Pool Client ID"
     Value: !Ref CognitoUserPoolClient
+  ItemsTable:
+    Description: "Items DynamoDB Table Name"
+    Value: !Ref ItemsTable

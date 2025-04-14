@@ -12,6 +12,7 @@ A professional template for AWS Lambda functions with development and production
 - API Gateway integration
 - Shared utilities for common functionality
 - Cognito User Pool authentication for protected endpoints
+- DynamoDB integration for item storage and retrieval
 
 ## Prerequisites
 
@@ -100,8 +101,8 @@ The response will include an `IdToken`. Use this token in the Authorization head
 Make an authenticated request to the `/goodbye` endpoint:
 ```bash
 curl -X GET \
-  <ApiEndpoint>/goodbye \
-  -H 'Authorization: Bearer <IdToken>'
+  "$API_ENDPOINT/goodbye" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 The response will include a personalized message with your user information:
@@ -184,6 +185,9 @@ LambdaTemplate/
 │   │   ├── goodbye/
 │   │   │   ├── __init__.py
 │   │   │   └── app.py        # Goodbye World Lambda function (protected)
+│   │   ├── hello_item/
+│   │   │   ├── __init__.py
+│   │   │   └── app.py        # Hello Item Lambda function (DynamoDB)
 │   │   └── __init__.py
 │   ├── shared/
 │   │   ├── __init__.py
@@ -200,6 +204,7 @@ LambdaTemplate/
 
 The functions use the following environment variables:
 - `ENVIRONMENT`: Set to either 'dev' or 'prod' based on deployment
+- `ITEMS_TABLE`: Name of the DynamoDB table (automatically set during deployment)
 
 The environment variable is automatically set during deployment based on the `Environment` parameter:
 ```bash
@@ -263,3 +268,31 @@ aws cloudformation delete-stack --stack-name LambdaTemplate
 ## License
 
 MIT
+
+## DynamoDB Integration
+
+The template includes a DynamoDB table for storing items with the following configuration:
+- Table Name: `{stack-name}-items`
+- Partition Key: `itemId` (String)
+- Billing Mode: PAY_PER_REQUEST
+
+### New Endpoint: /hello/{itemId}
+
+A new endpoint has been added that retrieves items from DynamoDB:
+- Path: `/hello/{itemId}`
+- Method: GET
+- Description: Returns "Hello, {name}" where name is retrieved from the DynamoDB item
+
+Example response:
+```json
+{
+    "message": "Hello, John! (Environment: dev)"
+}
+```
+
+If the item is not found, it returns a 404 error:
+```json
+{
+    "message": "Item with ID 123 not found"
+}
+```
