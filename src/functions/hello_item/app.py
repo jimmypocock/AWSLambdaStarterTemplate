@@ -1,11 +1,6 @@
 import os
 import boto3
-import json
 from common_utils import create_response, get_environment, log_event
-
-# Initialize DynamoDB client
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ['ITEMS_TABLE'])
 
 def lambda_handler(event, context):
     """
@@ -20,6 +15,10 @@ def lambda_handler(event, context):
     """
     log_event(event, context)
     environment = get_environment(event)
+
+    # Initialize DynamoDB client with environment variables
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(os.environ['ITEMS_TABLE'])
 
     # Get itemId from path parameters
     item_id = event['pathParameters']['itemId']
@@ -36,9 +35,9 @@ def lambda_handler(event, context):
         if 'Item' not in response:
             return create_response(
                 status_code=404,
-                body=json.dumps({
+                body={
                     'message': f'Item with ID {item_id} not found'
-                })
+                }
             )
 
         # Get the name from the item
@@ -46,15 +45,15 @@ def lambda_handler(event, context):
 
         return create_response(
             status_code=200,
-            body=json.dumps({
+            body={
                 'message': f'Hello, {name}! (Environment: {environment})'
-            })
+            }
         )
 
     except Exception as e:
         return create_response(
             status_code=500,
-            body=json.dumps({
+            body={
                 'message': f'Error retrieving item: {str(e)}'
-            })
+            }
         )

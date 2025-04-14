@@ -1,4 +1,3 @@
-import json
 from common_utils import create_response, get_environment, log_event
 
 def lambda_handler(event, context):
@@ -17,7 +16,7 @@ def lambda_handler(event, context):
 
     return create_response(
         status_code=200,
-        body=json.dumps({
+        body={
             'message': f'Hello, World! (Environment: {environment})'
-        })
+        }
     )

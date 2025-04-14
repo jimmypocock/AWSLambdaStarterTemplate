@@ -148,13 +148,30 @@ The layers will be automatically mounted to `/opt` in the Lambda runtime environ
 
 Run the test suite:
 ```bash
-pytest tests/
+python -m pytest tests/ -v
 ```
 
-Run tests with coverage:
+### DynamoDB Setup for Testing
+
+The `hello_item` function tests require a DynamoDB table and item to be set up. Here's how to create them:
+
+1. Create the DynamoDB table:
 ```bash
-pytest --cov=src tests/
+aws dynamodb create-table \
+    --table-name HelloWorld-items \
+    --attribute-definitions AttributeName=itemId,AttributeType=S \
+    --key-schema AttributeName=itemId,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
 ```
+
+2. Add a test item to the table:
+```bash
+aws dynamodb put-item \
+    --table-name HelloWorld-items \
+    --item '{"itemId": {"S": "first-item"}, "name": {"S": "Mrs. Doubtfire"}}'
+```
+
+The tests expect an item with `itemId="first-item"` and `name="Mrs. Doubtfire"` to be present in the table. Make sure to create this item before running the tests.
 
 ## Deployment
 
