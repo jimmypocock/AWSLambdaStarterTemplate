@@ -14,7 +14,9 @@ Globals:
         ENVIRONMENT: !Ref Stage
   Api:
     Auth:
-      DefaultAuthorizer: NONE
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt CognitoUserPool.Arn
 
 Parameters:
   Stage:
@@ -26,6 +28,30 @@ Parameters:
     Description: API Gateway Stage Name
 
 Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-user-pool"
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub "${AWS::StackName}-client"
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
   CommonLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -67,6 +93,8 @@ Resources:
           Properties:
             Path: /goodbye
             Method: get
+            Auth:
+              Authorizer: CognitoAuthorizer
 
 Outputs:
   ApiEndpoint:
@@ -81,3 +109,9 @@ Outputs:
   CommonLayer:
     Description: "Common Layer ARN"
     Value: !Ref CommonLayer
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref CognitoUserPoolClient

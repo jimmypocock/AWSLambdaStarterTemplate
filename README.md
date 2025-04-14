@@ -11,6 +11,7 @@ A professional template for AWS Lambda functions with development and production
 - SAM template for deployment
 - API Gateway integration
 - Shared utilities for common functionality
+- Cognito User Pool authentication for protected endpoints
 
 ## Prerequisites
 
@@ -40,8 +41,93 @@ sam local start-api
 ```
 
 The API will be available at:
-- http://localhost:3000/hello
-- http://localhost:3000/goodbye
+- http://localhost:3000/hello (public endpoint)
+- http://localhost:3000/goodbye (protected endpoint)
+
+## Authentication with Cognito
+
+The `/goodbye` endpoint is protected with Cognito authentication. Here's how to use it:
+
+### 1. Deploy the Stack
+
+First, deploy the stack to create the Cognito User Pool and API Gateway:
+```bash
+sam build && sam deploy --guided
+```
+
+After deployment, note down the following values from the stack outputs:
+- UserPoolId
+- UserPoolClientId
+- ApiEndpoint
+
+### 2. Create a User
+
+Create a user in the Cognito User Pool using the AWS CLI:
+```bash
+aws cognito-idp admin-create-user \
+    --user-pool-id <UserPoolId> \
+    --username <desired_username> \
+    --user-attributes Name=email,Value=<user_email> \
+    --temporary-password <temporary_password> \
+    --message-action SUPPRESS
+```
+
+### 3. Set User Password
+
+Set the user's permanent password:
+```bash
+aws cognito-idp admin-set-user-password \
+    --user-pool-id <UserPoolId> \
+    --username <username> \
+    --password <new_password> \
+    --permanent
+```
+
+### 4. Authenticate and Get Token
+
+Get an authentication token:
+```bash
+aws cognito-idp initiate-auth \
+    --client-id <UserPoolClientId> \
+    --auth-flow USER_PASSWORD_AUTH \
+    --auth-parameters USERNAME=<username>,PASSWORD=<password>
+```
+
+The response will include an `IdToken`. Use this token in the Authorization header when calling the protected endpoint.
+
+### 5. Call the Protected Endpoint
+
+Make an authenticated request to the `/goodbye` endpoint:
+```bash
+curl -X GET \
+  <ApiEndpoint>/goodbye \
+  -H 'Authorization: Bearer <IdToken>'
+```
+
+The response will include a personalized message with your user information:
+```json
+{
+  "message": "Goodbye, <username>! (Environment: <environment>)",
+  "user": {
+    "username": "<username>",
+    "email": "<email>"
+  }
+}
+```
+
+### 6. Configure Request Validation
+
+For the Cognito authorizer to work properly, you need to configure request validation on the `/goodbye` endpoint's method request:
+
+1. Go to the AWS Console and navigate to API Gateway
+2. Select your API (it will be named something like `LambdaTemplate-<stack-id>`)
+3. Click on the `/goodbye` resource
+4. Click on the `GET` method
+5. Click on "Method Request"
+6. Under "Request Validator", select "Validate body, query string parameters, and headers"
+7. Click the checkmark to save
+
+This ensures that the request validation is properly configured for the Cognito authorizer to work.
 
 ## Lambda Layers and Local Testing
 
@@ -97,7 +183,7 @@ LambdaTemplate/
 │   │   │   └── app.py        # Hello World Lambda function
 │   │   ├── goodbye/
 │   │   │   ├── __init__.py
-│   │   │   └── app.py        # Goodbye World Lambda function
+│   │   │   └── app.py        # Goodbye World Lambda function (protected)
 │   │   └── __init__.py
 │   ├── shared/
 │   │   ├── __init__.py
@@ -153,17 +239,26 @@ aws apigateway test-invoke-method \
     --http-method GET \
     --path-with-query-string /hello
 
-# Test the /goodbye endpoint
+# Test the /goodbye endpoint (requires authentication)
 aws apigateway test-invoke-method \
     --rest-api-id $(echo YOUR_API_ENDPOINT | cut -d/ -f3) \
     --resource-id /goodbye \
     --http-method GET \
-    --path-with-query-string /goodbye
+    --path-with-query-string /goodbye \
+    --headers 'Authorization=Bearer <IdToken>'
 ```
 
 Note: These commands require:
 - AWS CLI configured with valid credentials
 - Appropriate IAM permissions to invoke the API endpoints
+- For the /goodbye endpoint, a valid Cognito authentication token
+
+## Deleting all resources
+
+To delete all resources created by this template:
+```bash
+aws cloudformation delete-stack --stack-name LambdaTemplate
+```
 
 ## License
 
