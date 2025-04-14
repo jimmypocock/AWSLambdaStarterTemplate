@@ -43,6 +43,20 @@ The API will be available at:
 - http://localhost:3000/hello
 - http://localhost:3000/goodbye
 
+## Lambda Layers and Local Testing
+
+When testing Lambda functions with layers locally, SAM CLI automatically handles the layer content by downloading and mounting it to the correct path. You can test your functions with layers using:
+
+```bash
+# Invoke a specific function with an event file
+sam local invoke HelloWorldFunction -e events/event.json
+
+# Or invoke the GoodbyeWorld function
+sam local invoke GoodbyeWorldFunction -e events/event.json
+```
+
+The layers will be automatically mounted to `/opt` in the Lambda runtime environment, just as they would be in production. You can access layer content in your code using the same paths as in production.
+
 ## Testing
 
 Run the test suite:
@@ -119,6 +133,37 @@ To add a new Lambda function:
 1. Create a new directory under `src/functions/`
 2. Create an `app.py` file with your Lambda handler
 3. Add a new function resource in `template.yaml` with its API Gateway endpoint
+
+## Testing the API Endpoints
+
+### Using AWS CLI
+
+1. First, get the API endpoint URL from your deployed stack:
+```bash
+aws cloudformation describe-stacks --stack-name LambdaTemplate --query 'Stacks[0].Outputs[?OutputKey==`ApiEndpoint`].OutputValue' --output text
+```
+
+2. Test the endpoints using AWS CLI (replace YOUR_API_ENDPOINT with the actual endpoint URL):
+
+```bash
+# Test the /hello endpoint
+aws apigateway test-invoke-method \
+    --rest-api-id $(echo YOUR_API_ENDPOINT | cut -d/ -f3) \
+    --resource-id /hello \
+    --http-method GET \
+    --path-with-query-string /hello
+
+# Test the /goodbye endpoint
+aws apigateway test-invoke-method \
+    --rest-api-id $(echo YOUR_API_ENDPOINT | cut -d/ -f3) \
+    --resource-id /goodbye \
+    --http-method GET \
+    --path-with-query-string /goodbye
+```
+
+Note: These commands require:
+- AWS CLI configured with valid credentials
+- Appropriate IAM permissions to invoke the API endpoints
 
 ## License
 

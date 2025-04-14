@@ -1,0 +1,4 @@
+# Add any common dependencies that should be available to all Lambda functions
+# Example:
+# requests==2.31.0
+# boto3==1.34.0

@@ -12,6 +12,9 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Stage
+  Api:
+    Auth:
+      DefaultAuthorizer: NONE
 
 Parameters:
   Stage:
@@ -23,6 +26,16 @@ Parameters:
     Description: API Gateway Stage Name
 
 Resources:
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: common-layer
+      Description: Common utilities and dependencies
+      ContentUri: layers/
+      CompatibleRuntimes:
+        - python3.12
+      RetentionPolicy: Retain
+
   HelloWorldFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -30,6 +43,8 @@ Resources:
       Handler: functions.hello.app.lambda_handler
       Tags:
         Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
       Events:
         HelloWorld:
           Type: Api
@@ -44,6 +59,8 @@ Resources:
       Handler: functions.goodbye.app.lambda_handler
       Tags:
         Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
       Events:
         GoodbyeWorld:
           Type: Api
@@ -61,3 +78,6 @@ Outputs:
   GoodbyeWorldFunction:
     Description: "Goodbye World Lambda Function ARN"
     Value: !GetAtt GoodbyeWorldFunction.Arn
+  CommonLayer:
+    Description: "Common Layer ARN"
+    Value: !Ref CommonLayer

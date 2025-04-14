@@ -1,4 +1,4 @@
-from shared.utils import create_response, get_environment
+from common_utils import create_response, get_environment, log_event
 
 def lambda_handler(event, context):
     """
@@ -11,6 +11,7 @@ def lambda_handler(event, context):
     Returns:
         dict: Response containing status code and message
     """
+    log_event(event, context)
     environment = get_environment(event)
 
     return create_response(
