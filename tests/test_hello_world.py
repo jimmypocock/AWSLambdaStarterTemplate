@@ -10,9 +10,9 @@ def test_hello_world():
         text=True
     )
 
-    # Parse the response (body is double-encoded JSON)
+    # Parse the response (body is already a JSON string)
     response = json.loads(result.stdout)
-    body = json.loads(json.loads(response['body']))
+    body = json.loads(response['body'])
 
     # Assert the response
     assert response['statusCode'] == 200

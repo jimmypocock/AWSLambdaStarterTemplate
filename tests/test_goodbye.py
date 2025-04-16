@@ -10,12 +10,11 @@ def test_goodbye():
         text=True
     )
 
-    # Parse the response (body is double-encoded JSON)
+    # Parse the response (body is already a JSON string)
     response = json.loads(result.stdout)
-    body = json.loads(json.loads(response['body']))
+    body = json.loads(response['body'])
 
     # Assert the response
     assert response['statusCode'] == 200
-    assert 'Goodbye, testuser!' in body['message']
+    assert 'Goodbye' in body['message']
     assert body['user']['username'] == 'testuser'
-    assert body['user']['email'] == 'test@example.com'

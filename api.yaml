@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: API infrastructure for Lambda API
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, stage, prod]
+  Stage:
+    Type: String
+    Default: Dev
+    AllowedValues:
+      - Prod
+      - Stage
+      - Dev
+  NetworkStackName:
+    Type: String
+    Default: HelloWorld-network
+    Description: Name of the network stack to import resources from
+  DatabaseStackName:
+    Type: String
+    Default: HelloWorld-database
+    Description: Name of the database stack to import resources from
+  DBUsername:
+    Type: String
+    NoEcho: true
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+            Type: COGNITO_USER_POOLS
+            IdentitySource: method.request.header.Authorization
+
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-user-pool"
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub "${AWS::StackName}-client"
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: common-layer
+      Description: Common utilities and dependencies
+      ContentUri: layers/
+      CompatibleRuntimes:
+        - python3.12
+      RetentionPolicy: Retain
+
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/hello
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Stage
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-LambdaSecurityGroupId
+        SubnetIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+      Tags:
+        Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /hello
+            Method: get
+
+  GoodbyeWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/goodbye
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Stage
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-LambdaSecurityGroupId
+        SubnetIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+      Tags:
+        Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Events:
+        GoodbyeWorld:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /goodbye
+            Method: get
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  HelloItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/hello_item
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Stage
+          ITEMS_TABLE:
+            Fn::ImportValue: !Sub ${DatabaseStackName}-ItemsTable
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-LambdaSecurityGroupId
+        SubnetIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+      Tags:
+        Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName:
+              Fn::ImportValue: !Sub ${DatabaseStackName}-ItemsTable
+      Events:
+        HelloItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /hello/{itemId}
+            Method: get
+
+  GoodbyeItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/goodbye_item
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Stage
+          DB_HOST:
+            Fn::ImportValue: !Sub ${DatabaseStackName}-RDSInstanceEndpoint
+          DB_NAME: rdsdb
+          DB_USER: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
+          DB_PORT:
+            Fn::ImportValue: !Sub ${DatabaseStackName}-RDSInstancePort
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-LambdaSecurityGroupId
+        SubnetIds:
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
+          - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+      Tags:
+        Environment: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Events:
+        GoodbyeItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /goodbye/{itemId}
+            Method: get
+          Auth:
+            Authorizer: CognitoAuthorizer
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiEndpoint
+  HelloWorldFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn
+  GoodbyeWorldFunction:
+    Description: "Goodbye World Lambda Function ARN"
+    Value: !GetAtt GoodbyeWorldFunction.Arn
+  CommonLayer:
+    Description: "Common Layer ARN"
+    Value: !Ref CommonLayer
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref CognitoUserPoolClient

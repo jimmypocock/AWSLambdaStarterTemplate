@@ -41,6 +41,7 @@ env/
 .aws-sam/
 samconfig.toml
 *.zip
+*.pem
 
 # Logs
 *.log
@@ -54,4 +55,8 @@ logs/
 
 # Build output
 .sam/
-.aws-sam/ 
+.aws-sam/
+
+# Notes
+notes/
+/notes/*

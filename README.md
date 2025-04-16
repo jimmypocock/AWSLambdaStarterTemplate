@@ -20,6 +20,7 @@ A professional template for AWS Lambda functions with development and production
 - AWS SAM CLI
 - AWS CLI configured with appropriate credentials
 - Docker (for local testing)
+- AWS CLI installed and configured
 
 ## Setup
 
@@ -158,7 +159,7 @@ The `hello_item` function tests require a DynamoDB table and item to be set up. 
 1. Create the DynamoDB table:
 ```bash
 aws dynamodb create-table \
-    --table-name HelloWorld-items \
+    --table-name HelloWorld-database-items \
     --attribute-definitions AttributeName=itemId,AttributeType=S \
     --key-schema AttributeName=itemId,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
@@ -167,7 +168,7 @@ aws dynamodb create-table \
 2. Add a test item to the table:
 ```bash
 aws dynamodb put-item \
-    --table-name HelloWorld-items \
+    --table-name HelloWorld-database-items \
     --item '{"itemId": {"S": "first-item"}, "name": {"S": "Mrs. Doubtfire"}}'
 ```
 
@@ -175,20 +176,40 @@ The tests expect an item with `itemId="first-item"` and `name="Mrs. Doubtfire"` 
 
 ## Deployment
 
-1. Build the application:
+The deployment process uses a shell script that handles the deployment of all three stacks in the correct order. The script requires the following parameters:
+
+- `--db-username`: Username for the RDS database
+- `--db-password`: Password for the RDS database
+
+Optional parameters:
+- `--environment`: Environment name (default: "dev")
+- `--stage`: API Gateway stage name (default: "Dev")
+- `--stack-name`: Base name for the CloudFormation stacks (default: "HelloWorld")
+
+### Deployment Command
+
 ```bash
-sam build
+# Make the deployment script executable
+chmod +x deploy.sh
+
+# Deploy with required parameters
+./deploy.sh \
+  --db-username your-db-username \
+  --db-password your-db-password
+
+# Or deploy with all parameters
+./deploy.sh \
+  --environment dev \
+  --stage Dev \
+  --stack-name HelloWorld \
+  --db-username your-db-username \
+  --db-password your-db-password
 ```
 
-2. Deploy to development environment:
-```bash
-sam deploy --guided --parameter-overrides Environment=dev
-```
-
-3. Deploy to production environment:
-```bash
-sam deploy --guided --parameter-overrides Environment=prod
-```
+The script will deploy three CloudFormation stacks in sequence:
+1. Network stack (VPC, subnets, security groups, etc.)
+2. Database stack (RDS and DynamoDB)
+3. API stack (Lambda functions, API Gateway, etc.)
 
 ## Project Structure
 

@@ -16,18 +16,28 @@ def lambda_handler(event, context):
     log_event(event, context)
     environment = get_environment(event)
 
+    # Get table name from environment variables
+    table_name = os.environ.get('ITEMS_TABLE')
+    if not table_name:
+        return create_response(
+            status_code=500,
+            body={
+                'message': f'ITEMS_TABLE: {table_name} can not be found.'
+            }
+        )
+
     # Initialize DynamoDB client with environment variables
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(os.environ['ITEMS_TABLE'])
+    table = dynamodb.Table(table_name)
 
     # Get itemId from path parameters
     item_id = event['pathParameters']['itemId']
 
     try:
-        # Query DynamoDB for the item
+        # Query DynamoDB for the item using 'id' as the key
         response = table.get_item(
             Key={
-                'itemId': item_id
+                'id': item_id
             }
         )
 

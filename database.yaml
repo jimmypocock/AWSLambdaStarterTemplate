@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Database resources for the application
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  Stage:
+    Type: String
+    Default: Dev
+    AllowedValues:
+      - Dev
+      - Prod
+  DBUsername:
+    Type: String
+    NoEcho: true
+  DBPassword:
+    Type: String
+    NoEcho: true
+  NetworkStackName:
+    Type: String
+    Default: HelloWorld-network
+    Description: Name of the network stack to import resources from
+
+Resources:
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-items
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS instance
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Parameter group for RDS instance
+      Family: postgres17
+      Parameters:
+        rds.logical_replication: 1
+        wal_sender_timeout: 0
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      EngineVersion: 17.4
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      StorageType: gp3
+      DBName: rdsdb
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-RDSSecurityGroupId
+      DBParameterGroupName: !Ref DBParameterGroup
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+Outputs:
+  ItemsTable:
+    Description: Name of the DynamoDB table
+    Value: !Ref ItemsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-ItemsTable
+
+  RDSInstanceEndpoint:
+    Description: RDS instance endpoint
+    Value: !GetAtt RDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${AWS::StackName}-RDSInstanceEndpoint
+
+  RDSInstancePort:
+    Description: RDS instance port
+    Value: !GetAtt RDSInstance.Endpoint.Port
+    Export:
+      Name: !Sub ${AWS::StackName}-RDSInstancePort

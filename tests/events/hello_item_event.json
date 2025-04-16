@@ -1,15 +1,15 @@
 {
   "version": "2.0",
-  "routeKey": "GET /hello/{itemId}",
-  "rawPath": "/hello/nonexistent",
+  "routeKey": "GET /items/{id}",
+  "rawPath": "/items/first-item",
   "rawQueryString": "",
-  "pathParameters": {
-    "itemId": "nonexistent"
-  },
   "headers": {
     "accept": "*/*",
+    "content-length": "0",
     "host": "localhost:3000",
-    "user-agent": "curl/7.64.1"
+    "user-agent": "curl/7.64.1",
+    "x-forwarded-proto": "http",
+    "x-forwarded-port": "3000"
   },
   "requestContext": {
     "accountId": "123456789012",
@@ -18,16 +18,19 @@
     "domainPrefix": "localhost",
     "http": {
       "method": "GET",
-      "path": "/hello/nonexistent",
+      "path": "/items/first-item",
       "protocol": "HTTP/1.1",
       "sourceIp": "127.0.0.1",
       "userAgent": "curl/7.64.1"
     },
     "requestId": "id",
-    "routeKey": "GET /hello/{itemId}",
+    "routeKey": "GET /items/{id}",
     "stage": "$default",
-    "time": "12/Mar/2024:19:03:58 +0000",
-    "timeEpoch": 1710263038000
+    "time": "12/Mar/2020:19:03:58 +0000",
+    "timeEpoch": 1583348638390
+  },
+  "pathParameters": {
+    "id": "first-item"
   },
   "isBase64Encoded": false
 }

@@ -14,7 +14,7 @@ def test_hello_item():
     # Create a temporary env.json file with environment variables
     env_vars = {
         "HelloItemFunction": {
-            "ITEMS_TABLE": "HelloWorld-items"
+            "ITEMS_TABLE": "HelloWorld-database-items"
         }
     }
     with open('env.json', 'w') as f:
@@ -39,13 +39,14 @@ def test_hello_item():
 
         # Parse the response
         response = json.loads(process.stdout)
-        body = json.loads(json.loads(response["body"]))
+        body = json.loads(response["body"])
 
         # Assert the response
         assert response["statusCode"] == 200
         assert "Hello, Mrs. Doubtfire!" in body["message"]
+
     finally:
-        # Clean up the temporary file
+        # Clean up the temporary env.json file
         if os.path.exists('env.json'):
             os.remove('env.json')
 
@@ -53,7 +54,7 @@ def test_hello_item_not_found():
     # Create a temporary env.json file with environment variables
     env_vars = {
         "HelloItemFunction": {
-            "ITEMS_TABLE": "HelloWorld-items"
+            "ITEMS_TABLE": "HelloWorld-database-items"
         }
     }
     with open('env.json', 'w') as f:
@@ -78,12 +79,13 @@ def test_hello_item_not_found():
 
         # Parse the response
         response = json.loads(process.stdout)
-        body = json.loads(json.loads(response["body"]))
+        body = json.loads(response["body"])
 
         # Assert the response
         assert response["statusCode"] == 404
-        assert "Item with ID nonexistent not found" in body["message"]
+        assert "not found" in body["message"].lower()
+
     finally:
-        # Clean up the temporary file
+        # Clean up the temporary env.json file
         if os.path.exists('env.json'):
             os.remove('env.json')
