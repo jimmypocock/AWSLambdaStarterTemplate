@@ -22,6 +22,12 @@ Parameters:
     Type: String
     Default: HelloWorld-network
     Description: Name of the network stack to import resources from
+  VpcId:
+    Type: String
+  PrivateSubnet1Id:
+    Type: String
+  PrivateSubnet2Id:
+    Type: String
 
 Resources:
   ItemsTable:
@@ -44,10 +50,24 @@ Resources:
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Subnet group for RDS instance
+      DBSubnetGroupDescription: Subnet group for Aurora cluster
       SubnetIds:
-        - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet1Id
-        - Fn::ImportValue: !Sub ${NetworkStackName}-PrivateSubnet2Id
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+  DBClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: Parameter group for Aurora cluster
+      Family: aurora-mysql8.0
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -57,41 +77,105 @@ Resources:
   DBParameterGroup:
     Type: AWS::RDS::DBParameterGroup
     Properties:
-      Description: Parameter group for RDS instance
-      Family: postgres17
+      Description: Parameter group for Aurora instances
+      Family: aurora-mysql8.0
       Parameters:
-        rds.logical_replication: 1
-        wal_sender_timeout: 0
+        max_connections: "1000"
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Stage
           Value: !Ref Stage
 
-  RDSInstance:
-    Type: AWS::RDS::DBInstance
+  DBCluster:
+    Type: AWS::RDS::DBCluster
     Properties:
-      Engine: postgres
-      EngineVersion: 17.4
-      DBInstanceClass: db.t4g.micro
-      AllocatedStorage: 20
-      StorageType: gp3
-      DBName: rdsdb
+      Engine: aurora-mysql
+      EngineVersion: "8.0.mysql_aurora.3.07.0"
+      DatabaseName: rdsdb
       MasterUsername: !Ref DBUsername
       MasterUserPassword: !Ref DBPassword
       DBSubnetGroupName: !Ref DBSubnetGroup
-      VPCSecurityGroups:
-        - Fn::ImportValue: !Sub ${NetworkStackName}-RDSSecurityGroupId
-      DBParameterGroupName: !Ref DBParameterGroup
+      VpcSecurityGroupIds:
+        - !Ref DBSecurityGroup
       BackupRetentionPeriod: 7
-      MultiAZ: false
-      PubliclyAccessible: false
+      DBClusterParameterGroupName: !Ref DBClusterParameterGroup
       StorageEncrypted: true
+      EnableHttpEndpoint: true
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 1
+      EnableCloudwatchLogsExports:
+        - error
+        - slowquery
+        - audit
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Stage
           Value: !Ref Stage
+
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    DependsOn: DBSecurityGroup
+    Properties:
+      Engine: aurora-mysql
+      DBInstanceClass: db.serverless
+      DBClusterIdentifier: !Ref DBCluster
+      DBParameterGroupName: !Ref DBParameterGroup
+      PubliclyAccessible: false
+      MonitoringInterval: 60
+      MonitoringRoleArn: !GetAtt AuroraMonitoringRole.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stage
+          Value: !Ref Stage
+
+  AuroraMonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Aurora cluster
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+          Description: Allow Lambda functions to connect
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId:
+            Fn::ImportValue:
+              Fn::Sub: ${NetworkStackName}-SSMInstanceSecurityGroupId
+          Description: Allow SSM instance to connect
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda functions
+      VpcId: !Ref VpcId
+
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${AWS::StackName}-db-secret
+      Description: Database credentials
+      SecretString: !Sub '{"username": "${DBUsername}", "password": "${DBPassword}"}'
 
 Outputs:
   ItemsTable:
@@ -100,14 +184,26 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-ItemsTable
 
-  RDSInstanceEndpoint:
-    Description: RDS instance endpoint
-    Value: !GetAtt RDSInstance.Endpoint.Address
+  DBClusterEndpoint:
+    Description: Aurora cluster endpoint
+    Value: !GetAtt DBCluster.Endpoint.Address
     Export:
-      Name: !Sub ${AWS::StackName}-RDSInstanceEndpoint
+      Name: !Sub ${AWS::StackName}-DBClusterEndpoint
 
-  RDSInstancePort:
-    Description: RDS instance port
-    Value: !GetAtt RDSInstance.Endpoint.Port
+  DBClusterPort:
+    Description: Aurora cluster port
+    Value: !GetAtt DBCluster.Endpoint.Port
     Export:
-      Name: !Sub ${AWS::StackName}-RDSInstancePort
+      Name: !Sub ${AWS::StackName}-DBClusterPort
+
+  DBClusterArn:
+    Description: Aurora cluster ARN
+    Value: !GetAtt DBCluster.DBClusterArn
+    Export:
+      Name: !Sub ${AWS::StackName}-DBClusterArn
+
+  DBSecretArn:
+    Description: Database secret ARN
+    Value: !Ref DBSecret
+    Export:
+      Name: !Sub ${AWS::StackName}-DBSecretArn

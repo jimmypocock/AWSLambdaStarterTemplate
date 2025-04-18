@@ -5,17 +5,14 @@ STACK_NAME="HelloWorld"
 
 # Delete API stack first (depends on database and network)
 echo "Deleting API stack..."
-aws cloudformation delete-stack --stack-name ${STACK_NAME}-api
-aws cloudformation wait stack-delete-complete --stack-name ${STACK_NAME}-api
+sam delete --stack-name ${STACK_NAME}-api --no-prompts
 
 # Delete database stack (depends on network)
 echo "Deleting database stack..."
-aws cloudformation delete-stack --stack-name ${STACK_NAME}-database
-aws cloudformation wait stack-delete-complete --stack-name ${STACK_NAME}-database
+sam delete --stack-name ${STACK_NAME}-database --no-prompts
 
 # Delete network stack last (no dependencies)
 echo "Deleting network stack..."
-aws cloudformation delete-stack --stack-name ${STACK_NAME}-network
-aws cloudformation wait stack-delete-complete --stack-name ${STACK_NAME}-network
+sam delete --stack-name ${STACK_NAME}-network --no-prompts
 
 echo "Cleanup complete!"

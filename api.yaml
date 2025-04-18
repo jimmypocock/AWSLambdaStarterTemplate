@@ -189,13 +189,24 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Stage
-          DB_HOST:
-            Fn::ImportValue: !Sub ${DatabaseStackName}-RDSInstanceEndpoint
+          DB_CLUSTER_ARN: !ImportValue
+            Fn::Sub: ${DatabaseStackName}-DBClusterArn
+          DB_SECRET_ARN: !ImportValue
+            Fn::Sub: ${DatabaseStackName}-DBSecretArn
           DB_NAME: rdsdb
-          DB_USER: !Ref DBUsername
-          DB_PASSWORD: !Ref DBPassword
-          DB_PORT:
-            Fn::ImportValue: !Sub ${DatabaseStackName}-RDSInstancePort
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - rds-data:ExecuteStatement
+              Resource: !ImportValue
+                Fn::Sub: ${DatabaseStackName}-DBClusterArn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !ImportValue
+                Fn::Sub: ${DatabaseStackName}-DBSecretArn
       VpcConfig:
         SecurityGroupIds:
           - Fn::ImportValue: !Sub ${NetworkStackName}-LambdaSecurityGroupId
@@ -211,10 +222,10 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref MyApi
-            Path: /goodbye/{itemId}
+            Path: /goodbye/{id}
             Method: get
-          Auth:
-            Authorizer: CognitoAuthorizer
+            Auth:
+              Authorizer: CognitoAuthorizer
 
 Outputs:
   ApiEndpoint:

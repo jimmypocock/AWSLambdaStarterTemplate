@@ -1,28 +1,10 @@
+import boto3
 import os
-import psycopg2
 from common_utils import create_response, get_environment, log_event
-
-def get_db_connection():
-    """
-    Creates a connection to the RDS PostgreSQL database.
-    """
-    db_host = os.environ['DB_HOST']
-    db_name = os.environ['DB_NAME']
-    db_user = os.environ['DB_USER']
-    db_password = os.environ['DB_PASSWORD']
-    db_port = os.environ['DB_PORT']
-
-    return psycopg2.connect(
-        host=db_host,
-        database=db_name,
-        user=db_user,
-        password=db_password,
-        port=db_port
-    )
 
 def lambda_handler(event, context):
     """
-    Lambda function that returns a goodbye message with the name from RDS.
+    Lambda function that returns a goodbye message for a user by ID using RDS Data API.
 
     Args:
         event (dict): API Gateway event
@@ -34,45 +16,56 @@ def lambda_handler(event, context):
     log_event(event, context)
     environment = get_environment(event)
 
-    # Get itemId from path parameters
-    item_id = event['pathParameters']['itemId']
+    # Get user ID from path parameters
+    id = event.get('pathParameters', {}).get('id')
+    if not id:
+        return create_response(
+            status_code=400,
+            body={'message': 'User ID is required'}
+        )
+
+    # Initialize RDS Data API client
+    rds_data = boto3.client('rds-data')
 
     try:
-        # Connect to RDS
-        connection = get_db_connection()
-        cursor = connection.cursor()
+        # Execute SQL statement using RDS Data API
+        response = rds_data.execute_statement(
+            resourceArn=os.environ['DB_CLUSTER_ARN'],
+            secretArn=os.environ['DB_SECRET_ARN'],
+            database=os.environ['DB_NAME'],
+            sql='SELECT name FROM items WHERE id = :id',
+            parameters=[
+                {
+                    'name': 'id',
+                    'value': {'stringValue': id}
+                }
+            ]
+        )
 
-        # Query RDS for the item
-        cursor.execute("SELECT name FROM items WHERE id = %s", (item_id,))
-        result = cursor.fetchone()
-
-        # Close database connection
-        cursor.close()
-        connection.close()
-
-        # Check if item exists
-        if not result:
+        # Check if user was found
+        if not response.get('records'):
             return create_response(
                 status_code=404,
-                body={
-                    'message': f'Item with ID {item_id} not found'
-                }
+                body={'message': f'Item with ID {id} not found'}
             )
 
-        # Get the name from the result
-        name = result[0]
+        # Extract user data from response
+        item = response['records'][0]
+        name = item[0]['stringValue']
 
         return create_response(
             status_code=200,
             body={
-                'message': f'Goodbye, {name}! (Environment: {environment})'
+                'message': f'Goodbye, {name}! (Environment: {environment})',
+                'user': {
+                    'id': id,
+                    'name': name
+                }
             }
         )
 
     except Exception as e:
         return create_response(
             status_code=500,
-            body={
-                'message': f'Error retrieving item: {str(e)}'
-            }
+            body={'message': f'Error retrieving user: {str(e)}'}
         )
